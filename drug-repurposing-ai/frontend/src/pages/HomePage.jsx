@@ -1,41 +1,53 @@
 import React from 'react'
+
+import Navbar from '../components/Navbar'
+import Hero from '../components/Hero'
+import Features from '../components/Features'
+import About from '../components/About'
+import Workflow from '../components/Workflow'
+import Technology from '../components/Technology'
+import Feedback from '../components/Feedback'
+import FAQ from '../components/FAQ'
+import Footer from '../components/Footer'
+
 import FileUpload from '../components/FileUpload'
+import Disclaimer from '../components/Disclaimer'
 
 export default function HomePage() {
   return (
-    <div className="py-12">
-      <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">
-          Upload Medical Report
-        </h2>
-        <p className="text-gray-600 max-w-2xl mx-auto">
-          Upload a medical report to identify potential drug-repurposing candidates
-          using neuro-symbolic AI analysis. The system will extract clinical information,
-          connect to biomedical knowledge, and generate explainable candidate rankings.
-        </p>
-      </div>
+    <>
+      <Navbar />
 
-      <FileUpload />
+      <main>
+        <Hero />
+        <Features />
+        <About />
+        <Workflow />
+        <Technology />
 
-      <div className="mt-12 max-w-xl mx-auto">
-        <h3 className="text-sm font-semibold text-gray-500 mb-3" style={{ textTransform: 'uppercase' }}>
-          How it works
-        </h3>
-        <div className="space-y-3">
-          {[
-            'Upload a medical report (PDF, image, or text)',
-            'AI extracts diagnoses, symptoms, and clinical entities',
-            'Disease is mapped to biomedical knowledge graph',
-            'Neural + symbolic reasoning identifies candidate drugs',
-            'Results are ranked and explained with evidence paths',
-          ].map((step, i) => (
-            <div key={i} className="flex gap-3" style={{ alignItems: 'flex-start' }}>
-              <span className="step-number">{i + 1}</span>
-              <p className="text-sm text-gray-700">{step}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+        <section className="workspace-section" id="workspace">
+          <div className="section-heading">
+            <span className="eyebrow">AI RESEARCH WORKSPACE</span>
+            <h2>
+              Start Your <span>Drug Repurposing Analysis</span>
+            </h2>
+            <p>
+              Upload your supported medical document
+              to begin the computational research workflow.
+            </p>
+          </div>
+
+          <div className="upload-container">
+            <Disclaimer />
+            <FileUpload />
+          </div>
+        </section>
+
+        <Feedback />
+        <FAQ />
+      </main>
+
+      <Footer />
+    </>
   )
 }

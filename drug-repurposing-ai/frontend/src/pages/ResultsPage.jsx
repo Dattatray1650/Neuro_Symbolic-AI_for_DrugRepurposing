@@ -1,3 +1,4 @@
+import './ResultsPage.css'
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../services/api'
@@ -18,11 +19,19 @@ export default function ResultsPage() {
     const load = async () => {
       try {
         const [resR, graphR] = await Promise.all([
-          api.get(`/results/${reportId}`),
-          api.get(`/results/${reportId}/graph`),
-        ])
-        setResults(resR.data)
-        setGraphData(graphR.data)
+  api.get(`/results/${reportId}`),
+  api.get(`/results/${reportId}/graph`),
+])
+
+console.log('RESULTS API RESPONSE:', resR.data)
+console.log('CANDIDATES:', resR.data.candidates)
+
+setResults(resR.data)
+setGraphData(graphR.data)
+
+if (resR.data.candidates?.length > 0) {
+  setSelected(resR.data.candidates[0])
+}
         if (resR.data.candidates?.length > 0) setSelected(resR.data.candidates[0])
       } catch(e) {
         setError(e.response?.data?.detail || 'Failed to load results.')
@@ -43,7 +52,7 @@ export default function ResultsPage() {
   )
 
   return (
-    <div>
+    <div className="results-page">
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Drug Repurposing Results</h2>

@@ -1,48 +1,94 @@
 import React from 'react'
+import { Brain, GitBranch, CheckCircle2, Info } from 'lucide-react'
+import './ResultsComponents.css'
 
 export default function ExplanationView({ candidate }) {
   if (!candidate) return null
 
   const items = (candidate.evidence_paths || []).map((path) => ({
-    text: path.path.join(' → '),
-    rule: path.rule,
+    text: Array.isArray(path.path) ? path.path.join(' → ') : 'Evidence path unavailable',
+    rule: path.rule || 'Knowledge graph rule',
     weight: path.weight,
   }))
 
   return (
-    <div className="card">
-      <h3 className="text-lg font-semibold mb-4">Why This Candidate?</h3>
-      <p className="text-sm text-gray-600 mb-4">
-        {candidate.drug_name} was ranked #{candidate.rank} because:
+    <div className="card explanation-card">
+
+      <div className="explanation-header">
+        <div>
+          <span className="eyebrow">AI REASONING</span>
+          <h3>Why This Candidate?</h3>
+        </div>
+        <div className="explanation-icon">
+          <Brain size={22} />
+        </div>
+      </div>
+
+      <p className="explanation-intro">
+        <strong>{candidate.drug_name}</strong> was ranked #{candidate.rank}
+        based on the following computational evidence.
       </p>
 
-      <div className="space-y-3">
+      <div className="explanation-items">
+
         {items.map((item, i) => (
-          <div key={i} className="flex gap-2" style={{ alignItems: 'flex-start' }}>
-            <span className="text-green-500 flex-shrink-0">✓</span>
-            <div>
-              <p className="text-sm text-gray-700">{item.text}</p>
-              <p className="text-xs text-gray-400">Rule: {item.rule} (weight: {item.weight})</p>
+          <div className="explanation-item" key={i}>
+            <div className="explanation-check">
+              <CheckCircle2 size={17} />
+            </div>
+
+            <div className="explanation-content">
+              <p className="explanation-path">{item.text}</p>
+              <span className="explanation-meta">
+                Rule: {item.rule}
+                {item.weight != null && ` · Weight: ${item.weight}`}
+              </span>
             </div>
           </div>
         ))}
 
         {candidate.neural_score > 0 && (
-          <div className="flex gap-2" style={{ alignItems: 'flex-start' }}>
-            <span className="text-blue-500 flex-shrink-0">✓</span>
-            <p className="text-sm text-gray-700">
-              The neural model assigns a high embedding similarity (score: {candidate.neural_score.toFixed(3)})
-            </p>
+          <div className="explanation-item">
+            <div className="explanation-check neural">
+              <Brain size={17} />
+            </div>
+
+            <div className="explanation-content">
+              <p className="explanation-path">
+                Neural model similarity score
+              </p>
+              <span className="explanation-meta">
+                Score: {candidate.neural_score.toFixed(3)}
+              </span>
+            </div>
           </div>
         )}
 
-        <div className="flex gap-2" style={{ alignItems: 'flex-start' }}>
-          <span className="text-purple-500 flex-shrink-0">✓</span>
-          <p className="text-sm text-gray-700">
-            {items.length} distinct knowledge-graph path(s) support this candidate
-          </p>
+        <div className="explanation-item">
+          <div className="explanation-check graph">
+            <GitBranch size={17} />
+          </div>
+
+          <div className="explanation-content">
+            <p className="explanation-path">
+              {items.length} knowledge-graph evidence path(s) identified
+            </p>
+            <span className="explanation-meta">
+              Based on available computational research data
+            </span>
+          </div>
         </div>
+
       </div>
+
+      <div className="explanation-note">
+        <Info size={16} />
+        <p>
+          These explanations represent computational evidence, not proof of
+          clinical effectiveness or a medical recommendation.
+        </p>
+      </div>
+
     </div>
   )
 }

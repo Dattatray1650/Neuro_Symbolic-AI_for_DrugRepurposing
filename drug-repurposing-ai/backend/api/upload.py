@@ -1,54 +1,91 @@
 """Medical report upload and document processing endpoint."""
 
 import uuid
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
-from backend.config import UPLOAD_DIR, MAX_UPLOAD_SIZE_BYTES, ALLOWED_EXTENSIONS, TESSERACT_CMD
+from backend.config import (
+    UPLOAD_DIR,
+    MAX_UPLOAD_SIZE_BYTES,
+    ALLOWED_EXTENSIONS,
+    TESSERACT_CMD,
+)
+
 from backend.schemas.response import UploadResponse
+
 
 router = APIRouter()
 
-# In-memory storage for report data (will be replaced by DB in production)
+logger = logging.getLogger(__name__)
+
+# Temporary in-memory storage.
+# Reports are lost when the backend process restarts.
 report_store: dict = {}
 
 
 @router.post("/", response_model=UploadResponse)
 async def upload_report(file: UploadFile = File(...)):
-    """Upload a medical report (PDF, JPG, JPEG, PNG, or TXT).
+    """Upload and process a medical report."""
 
-    Processes the document immediately after upload:
-    - PDF: extracts text via PyMuPDF, OCR for scanned pages
-    - Images: runs OCR pipeline
-    - TXT: reads directly
-    """
-    # Validate file extension
+    # Validate filename
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="No filename provided."
+        )
+
     ext = Path(file.filename).suffix.lower()
+
+    # Validate extension
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+            detail=(
+                f"Unsupported file type '{ext}'. "
+                f"Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+            ),
         )
 
-    # Read file content
+    # Read file
     content = await file.read()
+
+    if not content:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file is empty."
+        )
 
     # Validate file size
     if len(content) > MAX_UPLOAD_SIZE_BYTES:
         raise HTTPException(
             status_code=400,
-            detail=f"File too large. Maximum size: {MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB",
+            detail=(
+                f"File too large. Maximum size: "
+                f"{MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB"
+            ),
         )
 
     # Generate unique report ID
     report_id = str(uuid.uuid4())
 
-    # Save file
-    save_path = UPLOAD_DIR / f"{report_id}{ext}"
-    save_path.write_bytes(content)
+    # Save uploaded file
+    try:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Process the document
+        save_path = UPLOAD_DIR / f"{report_id}{ext}"
+        save_path.write_bytes(content)
+
+    except Exception as e:
+        logger.exception("File saving failed")
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not save uploaded file: {str(e)}"
+        )
+
+    # Process document
     from document_processing.preprocessing import process_document
 
     try:
@@ -58,14 +95,21 @@ async def upload_report(file: UploadFile = File(...)):
             tesseract_cmd=TESSERACT_CMD,
         )
 
-        # Store the result for later retrieval
+        # Store processed report
         report_store[report_id] = {
             "report_id": report_id,
             "filename": file.filename,
             "file_type": ext,
             "file_size": len(content),
             "document_result": doc_result,
+            "analysis": None,
         }
+
+        logger.info("UPLOAD SUCCESS")
+        logger.info("REPORT ID: %s", report_id)
+        logger.info("REPORT STORE KEYS: %s", list(report_store.keys()))
+        logger.info("EXTRACTION METHOD: %s", doc_result.extraction_method)
+        logger.info("TEXT AVAILABLE: %s", doc_result.has_text)
 
         return UploadResponse(
             report_id=report_id,
@@ -74,23 +118,33 @@ async def upload_report(file: UploadFile = File(...)):
             file_size=len(content),
             status="processed",
             message=(
-                f"File uploaded and processed successfully. "
+                "File uploaded and processed successfully. "
                 f"Extraction method: {doc_result.extraction_method}. "
                 f"Text extracted: {'Yes' if doc_result.has_text else 'No'}. "
                 f"Pages: {doc_result.num_pages}."
-                + (f" Warnings: {'; '.join(doc_result.warnings)}" if doc_result.warnings else "")
+                + (
+                    f" Warnings: {'; '.join(doc_result.warnings)}"
+                    if doc_result.warnings else ""
+                )
             ),
         )
+
     except Exception as e:
-        # If processing fails, still store the upload but mark as unprocessed
+
+        logger.exception("DOCUMENT PROCESSING FAILED")
+
+        # Store upload information for debugging
         report_store[report_id] = {
             "report_id": report_id,
             "filename": file.filename,
             "file_type": ext,
             "file_size": len(content),
             "document_result": None,
+            "analysis": None,
             "error": str(e),
         }
+
+        logger.info("REPORT STORED WITH PROCESSING ERROR: %s", report_id)
 
         return UploadResponse(
             report_id=report_id,
@@ -98,21 +152,34 @@ async def upload_report(file: UploadFile = File(...)):
             file_type=ext,
             file_size=len(content),
             status="uploaded",
-            message=f"File uploaded but processing encountered an issue: {str(e)}",
+            message=(
+                "File uploaded, but document processing failed: "
+                f"{str(e)}"
+            ),
         )
 
 
 @router.get("/{report_id}/text")
 async def get_extracted_text(report_id: str):
-    """Get the extracted text from a processed report."""
+    """Get extracted text from a processed report."""
+
     if report_id not in report_store:
-        raise HTTPException(status_code=404, detail="Report not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Report not found. Please upload the file again."
+        )
 
     data = report_store[report_id]
     doc_result = data.get("document_result")
 
     if doc_result is None:
-        raise HTTPException(status_code=422, detail="Document has not been processed yet")
+        raise HTTPException(
+            status_code=422,
+            detail=data.get(
+                "error",
+                "Document has not been processed successfully."
+            )
+        )
 
     return {
         "report_id": report_id,
@@ -120,7 +187,7 @@ async def get_extracted_text(report_id: str):
         "num_pages": doc_result.num_pages,
         "has_text": doc_result.has_text,
         "confidence": doc_result.confidence,
-        "cleaned_text": doc_result.cleaned_text[:2000],  # Preview first 2000 chars
+        "cleaned_text": doc_result.cleaned_text[:2000],
         "full_text_length": len(doc_result.cleaned_text),
         "warnings": doc_result.warnings,
     }

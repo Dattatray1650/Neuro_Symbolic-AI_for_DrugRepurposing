@@ -1,4 +1,5 @@
 import React from 'react'
+import './ResultsComponents.css'
 
 const nodeColors = {
   Drug: '#3b82f6',
@@ -9,33 +10,82 @@ const nodeColors = {
 }
 
 export default function KnowledgeGraph({ graphData, onNodeClick }) {
-  if (!graphData?.nodes?.length) {
+  const nodes = graphData?.nodes || []
+
+  if (!nodes.length) {
     return (
-      <div className="card text-center text-gray-500">
-        <h3 className="text-lg font-semibold mb-2">Knowledge Graph</h3>
-        <p>Interactive graph visualization will appear here when data is available.</p>
-        <p className="text-xs mt-2 text-gray-400">
-          (react-force-graph-2d will render the graph in later phases)
-        </p>
+      <div className="card knowledge-graph">
+        <div className="graph-header">
+          <div>
+            <span className="eyebrow">BIOMEDICAL NETWORK</span>
+            <h3>Knowledge Graph</h3>
+            <p>Explore relationships between biomedical entities.</p>
+          </div>
+          <span className="graph-status">Awaiting graph data</span>
+        </div>
+
+        <div className="graph-empty">
+          <div className="graph-empty-icon">◎</div>
+          <h4>No graph data available</h4>
+          <p>
+            The graph will appear when biomedical relationship data
+            is returned by the backend.
+          </p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="card" style={{ padding: 0 }}>
-      <div className="p-4 border-b">
-        <h3 className="text-lg font-semibold">Knowledge Graph</h3>
-        <div className="flex gap-4 mt-2">
-          {Object.entries(nodeColors).map(([type, color]) => (
-            <div key={type} className="flex items-center gap-1">
-              <div style={{ width: 12, height: 12, borderRadius: '50%', background: color }} />
-              <span className="text-xs text-gray-600">{type}</span>
-            </div>
-          ))}
+    <div className="card knowledge-graph">
+      <div className="graph-header">
+        <div>
+          <span className="eyebrow">BIOMEDICAL NETWORK</span>
+          <h3>Knowledge Graph</h3>
+          <p>Biomedical entities identified in this analysis.</p>
         </div>
+
+        <span className="graph-count">
+          {nodes.length} Nodes
+        </span>
       </div>
-      <div style={{ height: 500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p className="text-gray-400">Graph visualization placeholder — will be connected in Phase 9</p>
+
+      <div className="graph-legend">
+        {Object.entries(nodeColors).map(([type, color]) => (
+          <div className="legend-item" key={type}>
+            <span
+              className="legend-dot"
+              style={{ background: color }}
+            />
+            {type}
+          </div>
+        ))}
+      </div>
+
+      <div className="graph-node-list">
+        {nodes.map((node, index) => {
+          const type = node.type || node.label || 'Drug'
+          const color = nodeColors[type] || '#64748b'
+
+          return (
+            <button
+              key={node.id || index}
+              className="graph-node"
+              onClick={() => onNodeClick?.(node)}
+            >
+              <span
+                className="legend-dot"
+                style={{ background: color }}
+              />
+              <span>{node.name || node.id || 'Unknown entity'}</span>
+              <small>{type}</small>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="graph-note">
+        Entity listing only — this is not an interactive network visualization.
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
 import React from 'react'
+import './ResultsComponents.css'
 
 export default function CandidateResults({ candidates = [], onSelect }) {
   if (candidates.length === 0) {
